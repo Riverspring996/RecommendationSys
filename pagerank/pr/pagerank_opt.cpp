@@ -10,6 +10,7 @@
 #include <windows.h>
 #include <iomanip> // 用于setprecision
 #include <omp.h>   // 用于OpenMP并行
+#include <psapi.h> // 用于获取内存使用情况
 #include <tuple>   // 用于临时存储元素
 
 using namespace std;
@@ -288,12 +289,8 @@ vector<pair<int, double>> computePageRank(const GlobalSparseMatrix& global_csr_g
     }
 
     // --- 构建 BCSR 矩阵 ---
-    auto start_build = chrono::high_resolution_clock::now();
     BlockedCSRMatrix bcsr_matrix(n);
     bcsr_matrix.buildFromGlobalCSR(global_csr_graph);
-    auto end_build = chrono::high_resolution_clock::now();
-    auto duration_build = chrono::duration_cast<chrono::milliseconds>(end_build - start_build).count();
-    cout << "构建 BCSR 矩阵耗时: " << duration_build << " 毫秒" << endl;
     // -----------------------
 
     double teleport_prob = (1.0 - alpha) / n;
@@ -355,11 +352,22 @@ vector<pair<int, double>> computePageRank(const GlobalSparseMatrix& global_csr_g
     return result;
 }
 
+void printPeakMemoryUsage() {
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+        double peakWorkingSetMB = static_cast<double>(pmc.PeakWorkingSetSize) / (1024 * 1024);
+        cout << fixed << setprecision(2);
+        cout << "程序运行时峰值内存使用: " << peakWorkingSetMB << " MB" << endl;
+    } else {
+        cerr << "无法获取内存使用信息。" << endl;
+    }
+}
+
 int main() {
     SetConsoleOutputCP(65001);
     int num_threads = 8; // 设置线程数
     omp_set_num_threads(num_threads);
-    cout << "使用 OpenMP 线程数: " << num_threads << endl;
+    cout << "使用线程数: " << num_threads << endl;
 
     auto start_time = chrono::high_resolution_clock::now();
 
@@ -387,6 +395,8 @@ int main() {
 
     cout << "计算完成，结果已保存到 Res_bcsr.txt" << endl;
     cout << "总运行时间: " << duration << " 毫秒" << endl;
+
+    printPeakMemoryUsage();
     system("pause");
     // 编译命令: g++ pagerank_bcsr.cpp -o pagerank_bcsr.exe -fopenmp -O2 (或 -O3)
 
