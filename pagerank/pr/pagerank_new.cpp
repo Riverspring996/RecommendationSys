@@ -7,7 +7,9 @@
 #include <cmath>
 #include <numeric>
 #include <chrono>
+#include <windows.h>
 #include <iomanip> // 用于setprecision
+#include <omp.h> // 用于OpenMP并行
 
 using namespace std;
 
@@ -57,41 +59,41 @@ public:
     }
     
     // 块矩阵向量乘法, y = Ax
-void multiplyVector(const vector<double>& x, vector<double>& y) const {
-    fill(y.begin(), y.end(), 0.0);
-    
-    // 使用OpenMP进行并行化
-    #pragma omp parallel for collapse(2)
-    for (int bi = 0; bi < num_blocks; bi++) {
-        for (int bj = 0; bj < num_blocks; bj++) {
-            int block_idx = bi * num_blocks + bj;
-            
-            // 跳过空块
-            if (blocks[block_idx].empty()) continue;
-            
-            const auto& block = blocks[block_idx];
-            
-            // 确定当前块的实际维度
-            int row_start = bi * BLOCK_SIZE;
-            int row_end = min(row_start + BLOCK_SIZE, n);
-            int col_start = bj * BLOCK_SIZE;
-            int col_end = min(col_start + BLOCK_SIZE, n);
-            
-            // 对块内每个元素进行矩阵-向量乘法
-            for (int i = row_start; i < row_end; i++) {
-                for (int j = col_start; j < col_end; j++) {
-                    int local_i = i - row_start;
-                    int local_j = j - col_start;
-                    int idx = local_i * BLOCK_SIZE + local_j;
-                    
-                    if (idx < block.size() && block[idx] != 0.0) {
-                        y[i] += block[idx] * x[j];  // 向量与矩阵乘法
+    void multiplyVector(const vector<double>& x, vector<double>& y) const {
+        fill(y.begin(), y.end(), 0.0);
+        
+        // 使用OpenMP进行并行化
+        #pragma omp parallel for collapse(2)
+        for (int bi = 0; bi < num_blocks; bi++) {
+            for (int bj = 0; bj < num_blocks; bj++) {
+                int block_idx = bi * num_blocks + bj;
+                
+                // 跳过空块
+                if (blocks[block_idx].empty()) continue;
+                
+                const auto& block = blocks[block_idx];
+                
+                // 确定当前块的实际维度
+                int row_start = bi * BLOCK_SIZE;
+                int row_end = min(row_start + BLOCK_SIZE, n);
+                int col_start = bj * BLOCK_SIZE;
+                int col_end = min(col_start + BLOCK_SIZE, n);
+                
+                // 对块内每个元素进行矩阵-向量乘法
+                for (int i = row_start; i < row_end; i++) {
+                    for (int j = col_start; j < col_end; j++) {
+                        int local_i = i - row_start;
+                        int local_j = j - col_start;
+                        int idx = local_i * BLOCK_SIZE + local_j;
+                        
+                        if (idx < block.size() && block[idx] != 0.0) {
+                            y[i] += block[idx] * x[j];  // 向量与矩阵乘法
+                        }
                     }
                 }
             }
         }
     }
-}
    
     // 获取某一块
     vector<double>& getBlock(int i, int j) {
@@ -193,7 +195,7 @@ SparseMatrix readGraph(const string& filename) {
 }
 
 // 使用块矩阵优化的PageRank算法
-vector<pair<int, double>> computePageRank(const SparseMatrix& sparse_graph, double alpha = 0.85, double epsilon = 1e-10) {
+vector<pair<int, double>> computePageRank(const SparseMatrix& sparse_graph, double alpha = 0.85, double epsilon = 1e-8) {
     int n = sparse_graph.n;
     vector<double> pr(n, 1.0 / n);  // 初始PageRank值
     vector<double> next_pr(n, 0.0);  // 下一轮的PageRank值
@@ -262,6 +264,8 @@ vector<pair<int, double>> computePageRank(const SparseMatrix& sparse_graph, doub
 }
 
 int main() {
+    SetConsoleOutputCP(65001);
+    omp_set_num_threads(10);
     auto start_time = chrono::high_resolution_clock::now();
     
     // 读取数据并构建图
@@ -272,7 +276,7 @@ int main() {
     auto pagerank_result = computePageRank(graph);
     
     // 输出前100个结果到文件
-    ofstream outfile("Res.txt");
+    ofstream outfile("Res_new.txt");
     if (!outfile) {
         cerr << "无法创建输出文件!" << endl;
         return 1;
@@ -285,10 +289,14 @@ int main() {
     outfile.close();
     
     auto end_time = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<chrono::seconds>(end_time - start_time).count();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
+
+    float duration_t = duration/1000;
     
     cout << "计算完成，结果已保存到Res.txt" << endl;
-    cout << "总运行时间: " << duration << " 秒" << endl;
+    cout << "总运行时间: " << duration << " 毫秒" << endl;
+    system("pause");
+    // 运行命令: g++ pagerank_new.cpp -o pagerank_new.exe -fopenmp
     
     return 0;
 }

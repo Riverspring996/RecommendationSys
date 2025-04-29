@@ -7,6 +7,7 @@
 #include <cmath>
 #include <numeric>
 #include <chrono>
+#include <windows.h>
 #include <iomanip> // 用于setprecision
 
 using namespace std;
@@ -133,7 +134,7 @@ SparseMatrix readGraph(const string& filename) {
 }
 
 // 执行PageRank算法
-vector<pair<int, double>> computePageRank(const SparseMatrix& graph, double alpha = 0.85, double epsilon = 1e-10) {
+vector<pair<int, double>> computePageRank(const SparseMatrix& graph, double alpha = 0.85, double epsilon = 1e-8) {
     int n = graph.n;
     vector<double> pr(n, 1.0 / n);  // 初始PageRank值
     vector<double> next_pr(n, 0.0);  // 下一轮的PageRank值
@@ -203,6 +204,7 @@ vector<pair<int, double>> computePageRank(const SparseMatrix& graph, double alph
 }
 
 int main() {
+    SetConsoleOutputCP(65001);
     auto start_time = chrono::high_resolution_clock::now();
     
     // 读取数据并构建图
@@ -226,10 +228,13 @@ int main() {
     outfile.close();
     
     auto end_time = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<chrono::seconds>(end_time - start_time).count();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
+
+    float duration_t = duration/1000;
     
     cout << "计算完成，结果已保存到Res.txt" << endl;
-    cout << "总运行时间: " << duration << " 秒" << endl;
+    cout << "总运行时间: " << duration << " 毫秒" << endl;
+    system("pause");
     
     return 0;
 }

@@ -9,7 +9,7 @@
       "stopAtEntry": false,
       "externalConsole": true,
       "cwd": "e:/Bigdata_Recosys/pagerank大作业/pr",
-      "program": "e:/Bigdata_Recosys/pagerank大作业/pr/build/Debug/outDebug",
+      "program": "${fileDirname}\\${fileBasenameNoExtension}.exe",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [
