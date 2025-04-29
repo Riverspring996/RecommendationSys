@@ -206,9 +206,13 @@ vector<pair<int, double>> computePageRank(const SparseMatrix& sparse_graph, doub
         is_dead_end[col] = false;
     }
     
+    auto start_time = chrono::high_resolution_clock::now();
     // 构建块矩阵
     BlockMatrix block_matrix(n);
     block_matrix.buildFromSparse(sparse_graph);
+    auto mid1_time = chrono::high_resolution_clock::now();
+    auto duration1 = chrono::duration_cast<chrono::milliseconds>(mid1_time - start_time).count();
+    cout << "构建块矩阵耗时: " << duration1 << " 毫秒" << endl;
     
     double teleport_prob = (1.0 - alpha) / n;
     int iterations = 0;
@@ -218,7 +222,13 @@ vector<pair<int, double>> computePageRank(const SparseMatrix& sparse_graph, doub
     while (diff > epsilon && iterations < 100) {
         // 矩阵-向量乘法 (使用块矩阵优化)
         vector<double> temp_pr(n, 0.0);
+        auto start_time1 = chrono::high_resolution_clock::now();
+
         block_matrix.multiplyVector(pr, temp_pr);
+        
+        auto end_time1 = chrono::high_resolution_clock::now();
+        auto multi_duration = chrono::duration_cast<chrono::milliseconds>(end_time1 - start_time1).count();
+        cout << "矩阵-向量乘法耗时: " << multi_duration << " 毫秒" << endl;
         
         // 处理Dead-ends（无出链节点）
         double dead_end_score = 0.0;
@@ -247,6 +257,9 @@ vector<pair<int, double>> computePageRank(const SparseMatrix& sparse_graph, doub
     }
     
     cout << "PageRank计算收敛，迭代次数: " << iterations << endl;
+    auto mid2_time = chrono::high_resolution_clock::now();
+    auto duration2 = chrono::duration_cast<chrono::milliseconds>(mid2_time - mid1_time).count();
+    cout << "PageRank计算耗时: " << duration2 << " 毫秒" << endl;
     
     // 将PageRank值与原始节点ID关联
     vector<pair<int, double>> result;
@@ -290,8 +303,6 @@ int main() {
     
     auto end_time = chrono::high_resolution_clock::now();
     auto duration = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
-
-    float duration_t = duration/1000;
     
     cout << "计算完成，结果已保存到Res.txt" << endl;
     cout << "总运行时间: " << duration << " 毫秒" << endl;

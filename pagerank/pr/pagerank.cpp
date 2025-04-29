@@ -144,7 +144,9 @@ vector<pair<int, double>> computePageRank(const SparseMatrix& graph, double alph
     for (int col : graph.cols) {
         is_dead_end[col] = false;
     }
-    
+
+    auto start_time = chrono::high_resolution_clock::now();
+
     double teleport_prob = (1.0 - alpha) / n;
     int iterations = 0;
     double diff = 1.0;
@@ -154,6 +156,8 @@ vector<pair<int, double>> computePageRank(const SparseMatrix& graph, double alph
         // 重置下一轮的PR值
         fill(next_pr.begin(), next_pr.end(), 0.0);
         
+        auto start_time1 = chrono::high_resolution_clock::now();
+
         // PageRank矩阵向量乘法（稀疏矩阵优化）
         for (size_t i = 0; i < graph.values.size(); i++) {
             int row = graph.rows[i];
@@ -161,6 +165,10 @@ vector<pair<int, double>> computePageRank(const SparseMatrix& graph, double alph
             double val = graph.values[i];
             next_pr[row] += alpha * val * pr[col];
         }
+
+        auto end_time1 = chrono::high_resolution_clock::now();
+        auto multi_duration = chrono::duration_cast<chrono::milliseconds>(end_time1 - start_time1).count();
+        cout << "矩阵-向量乘法耗时: " << multi_duration << " 毫秒" << endl;
         
         // 处理Dead-ends（无出链节点）
         double dead_end_score = 0.0;
@@ -187,6 +195,9 @@ vector<pair<int, double>> computePageRank(const SparseMatrix& graph, double alph
     }
     
     cout << "PageRank计算收敛，迭代次数: " << iterations << endl;
+    auto end_time = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
+    cout << "PageRank计算耗时: " << duration << " 毫秒" << endl;
     
     // 将PageRank值与原始节点ID关联
     vector<pair<int, double>> result;
