@@ -22,7 +22,7 @@ def compute_reference(input_file='Data.txt', output_file='nx_Res.txt', alpha=0.8
             fw.write(f"{node} {score:.8f}\n")
     print(f"Reference PageRank result written to {output_file}.")
 
-def compare_results(file_user='Res_bcsr.txt', file_ref='block.txt', topk=100):
+def compare_results(file_user='Res.txt', file_ref='block.txt', topk=100):
     def load_nodes(path):
         with open(path, 'r') as f:
             return [int(line.split()[0]) for line in f if line.strip()]

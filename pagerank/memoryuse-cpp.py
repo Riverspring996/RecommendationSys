@@ -67,7 +67,7 @@ def monitor_memory(executable_path, *args):
 def main():
     cpp_file,prog_args='',''
     if len(sys.argv) < 2:
-        cpp_file='pagerank.cpp'
+        cpp_file='pagerank_opt.cpp'
         prog_args=''
     
     else:
