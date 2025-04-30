@@ -23,7 +23,7 @@ if __name__ == "__main__":
     G = load_graph(data_path)
 
     print("开始计算 PageRank …")
-    pr = nx.pagerank(G, alpha=alpha, tol=1e-8)  # tol 越小收敛越严格
+    pr = nx.pagerank(G, alpha=alpha, tol=1e-8, dangling=None)  # tol 越小收敛越严格
 
     top100 = sorted(pr.items(), key=lambda x: x[1], reverse=True)[:100]
 
@@ -31,4 +31,5 @@ if __name__ == "__main__":
         for node, score in top100:
             f.write(f"{node} {score:.10f}\n")
 
+    print("hhh")
     print("已写入 nbw.txt")

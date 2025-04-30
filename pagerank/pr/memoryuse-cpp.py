@@ -67,7 +67,7 @@ def monitor_memory(executable_path, *args):
 def main():
     cpp_file,prog_args='',''
     if len(sys.argv) < 2:
-        cpp_file='pagerank.cpp'
+        cpp_file='e:\Bigdata_Recosys\pagerank\pr\pagerank_opt.cpp'
         prog_args=''
     
     else:
@@ -79,7 +79,8 @@ def main():
         sys.exit(1)
         
     compiler = os.environ.get("CXX", "g++")
-    compile_flags = os.environ.get("CXXFLAGS", "-fopenmp -mavx2")
+    # compile_flags = os.environ.get("CXXFLAGS", "-fopenmp -mavx2")
+    compile_flags = "-fopenmp -O2 -march=native -lpsapi -static"
     
     executable = compile_cpp(cpp_file, compiler=compiler, compile_flags=compile_flags)
     

@@ -2,20 +2,20 @@
 #include <fstream>
 #include <vector>
 #include <unordered_map>
+#include <tuple>
 #include <algorithm>
 #include <string>
 #include <cmath>
 #include <numeric>
 #include <chrono>
 #include <windows.h>
-#include <iomanip> // 用于setprecision
+#include <iomanip> // 用于设定浮点数输出规则
 #include <omp.h>   // 用于OpenMP并行
 #include <psapi.h> // 用于获取内存使用情况
-#include <tuple>   // 用于临时存储元素
 
 using namespace std;
 
-// 全局稀疏矩阵结构（CSR格式） - 仍然需要用于读取和映射
+// 全局稀疏矩阵结构（CSR格式）
 struct GlobalSparseMatrix {
     vector<double> values;
     vector<int> col_indices;
@@ -49,8 +49,7 @@ struct CSRBlock {
 class BlockedCSRMatrix {
 public:
     // --- 块大小定义 ---
-    // 块大小的选择对性能影响很大，需要根据缓存大小和数据特性调整
-    // 常见的块大小是 4x4, 8x8, 16x16 等，但也可以是非方形的
+    // 经过调试，最大限度利用cache大小来填充每次计算块
     static const int BLOCK_ROW_SIZE = 512;
     static const int BLOCK_COL_SIZE = 512;
     // --------------------
@@ -194,13 +193,11 @@ public:
     }
 };
 
-// --- 读取和 PageRank 计算 ---
-
 // 读取数据集并构建全局稀疏矩阵 (CSR格式)
 GlobalSparseMatrix readGraph(const string& filename) {
     GlobalSparseMatrix graph;
     ifstream file(filename);
-    if (!file) { /* ... error handling ... */ exit(1); }
+    if (!file) { exit(1); }
 
     vector<pair<int, int>> edges;
     unordered_map<int, vector<int>> adj_list;
@@ -259,7 +256,8 @@ GlobalSparseMatrix readGraph(const string& filename) {
                  graph.col_indices[current_nnz] = pair.first;
                  graph.values[current_nnz] = pair.second;
                  current_nnz++;
-            } else { /* error */ }
+            } 
+            else { /* error */ }
         }
     }
     graph.row_ptr[graph.n] = current_nnz;
@@ -272,7 +270,7 @@ GlobalSparseMatrix readGraph(const string& filename) {
 }
 
 // 使用 BCSR 优化的 PageRank 算法
-vector<pair<int, double>> computePageRank(const GlobalSparseMatrix& global_csr_graph, double alpha = 0.85, double epsilon = 1e-8) {
+vector<pair<int, double>> computePageRank(const GlobalSparseMatrix& global_csr_graph, double alpha = 0.85, double tol = 1e-10) {
     int n = global_csr_graph.n;
     if (n == 0) return {};
 
@@ -298,12 +296,15 @@ vector<pair<int, double>> computePageRank(const GlobalSparseMatrix& global_csr_g
     double diff = 1.0;
     auto start_pagerank = chrono::high_resolution_clock::now();
 
+    double epsilon = tol * n;
     while (diff > epsilon && iterations < 100) {
         // --- BCSR 矩阵向量乘法 ---
-        auto start_iter = chrono::high_resolution_clock::now();
+        // auto start_iter = chrono::high_resolution_clock::now();
+
         bcsr_matrix.multiplyVector(pr, temp_pr); // 使用 BCSR 乘法
-        auto end_iter = chrono::high_resolution_clock::now();
-        auto multi_duration = chrono::duration_cast<chrono::milliseconds>(end_iter - start_iter).count();
+
+        // auto end_iter = chrono::high_resolution_clock::now();
+        // auto multi_duration = chrono::duration_cast<chrono::milliseconds>(end_iter - start_iter).count();
         // cout << " 迭代 " << iterations + 1 << " BCSR 乘法耗时: " << multi_duration << " 毫秒" << endl;
         // --------------------------
 
@@ -317,13 +318,13 @@ vector<pair<int, double>> computePageRank(const GlobalSparseMatrix& global_csr_g
         }
         dead_end_contribution *= alpha / n;
 
-        // 计算 next_pr (可以并行优化)
+        // 计算 next_pr (并行优化+自动向量化)
         #pragma omp parallel for simd
         for (int i = 0; i < n; i++) {
             next_pr[i] = alpha * temp_pr[i] + teleport_prob + dead_end_contribution;
         }
 
-        // 计算差异 (可以并行优化)
+        // 计算差异 (并行优化+自动向量化)
         diff = 0.0;
         #pragma omp parallel for simd reduction(+:diff)
         for (int i = 0; i < n; i++) {
@@ -352,17 +353,6 @@ vector<pair<int, double>> computePageRank(const GlobalSparseMatrix& global_csr_g
     return result;
 }
 
-void printPeakMemoryUsage() {
-    PROCESS_MEMORY_COUNTERS pmc;
-    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
-        double peakWorkingSetMB = static_cast<double>(pmc.PeakWorkingSetSize) / (1024 * 1024);
-        cout << fixed << setprecision(2);
-        cout << "程序运行时峰值内存使用: " << peakWorkingSetMB << " MB" << endl;
-    } else {
-        cerr << "无法获取内存使用信息。" << endl;
-    }
-}
-
 int main() {
     SetConsoleOutputCP(65001);
     int num_threads = 8; // 设置线程数
@@ -378,11 +368,10 @@ int main() {
     // 计算 PageRank (使用 BCSR 优化)
     auto pagerank_result = computePageRank(graph);
 
-    // 输出结果
-    ofstream outfile("Res_bcsr.txt");
-    if (!outfile) { /* ... error handling ... */ return 1; }
+    ofstream outfile("Res.txt");
+    if (!outfile) { return 1; }
     int top_k = min(100, static_cast<int>(pagerank_result.size()));
-    outfile << fixed << setprecision(8);
+    outfile << fixed << setprecision(10);
     for (int i = 0; i < top_k; i++) {
         if (pagerank_result[i].first != -1) {
              outfile << pagerank_result[i].first << " " << pagerank_result[i].second << "\n";
@@ -393,12 +382,11 @@ int main() {
     auto end_time = chrono::high_resolution_clock::now();
     auto duration = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
 
-    cout << "计算完成，结果已保存到 Res_bcsr.txt" << endl;
+    cout << "计算完成，结果已保存到 Res.txt" << endl;
     cout << "总运行时间: " << duration << " 毫秒" << endl;
-
-    printPeakMemoryUsage();
     system("pause");
-    // 编译命令: g++ pagerank_bcsr.cpp -o pagerank_bcsr.exe -fopenmp -O2 (或 -O3)
+
+    // 编译命令: g++ pagerank.cpp -o pagerank.exe -fopenmp -O2 -march=native -static
 
     return 0;
 }
